@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Churn Prediction</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    /* Your CSS styling remains unchanged here... (kept for brevity) */
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100 p-6">
+  <div class="container mx-auto">
+    <div class="header flex items-center gap-4 mb-6">
+      <i>👤</i>
+      <div>
+        <h1 class="text-3xl font-bold">Customer Churn Prediction</h1>
+        <p class="subtitle">Predict customer behavior with machine learning</p>
+      </div>
+    </div>
+
+    <form id="churnForm">
+      <div class="flex flex-col lg:flex-row gap-6">
+        <div class="card">
+          <h2>Customer Information</h2>
+          <label for="CreditScore">Credit Score *</label>
+          <input type="number" id="CreditScore" placeholder="650" required min="300" max="850" />
+          <div class="info">Valid range: 300–850</div>
+
+          <label for="Age">Age *</label>
+          <input type="number" id="Age" placeholder="35" required min="18" max="100" />
+          <div class="info">Valid range: 18–100</div>
+
+          <label for="Geography">Geography *</label>
+          <select id="Geography" required>
+            <option value="France">France</option>
+            <option value="Spain">Spain</option>
+            <option value="Germany">Germany</option>
+          </select>
+
+          <label for="Gender">Gender *</label>
+          <select id="Gender" required>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+
+        <div class="card">
+          <h2>Account Details</h2>
+          <label for="Balance">Balance *</label>
+          <input type="number" id="Balance" placeholder="50000" required min="0" max="1000000" />
+          <div class="info">Valid range: 0–1,000,000</div>
+
+          <label for="NumOfProducts">Number of Products *</label>
+          <input type="number" id="NumOfProducts" placeholder="1" required min="1" max="4" />
+          <div class="info">Valid range: 1–4</div>
+
+          <div class="checkbox-group">
+            <label>
+              <input type="checkbox" id="HasCrCard" checked />
+              💳 Has Credit Card
+            </label>
+            <label>
+              <input type="checkbox" id="IsActiveMember" checked />
+              🧑‍💼 Active Member
+            </label>
+          </div>
+
+          <button type="submit" class="mb-6">Predict Churn</button>
+        </div>
+      </div>
+    </form>
+
+    <div id="result"></div>
+
+    <a href="/" class="text-green-400 hover:underline mb-6 inline-block text-lg">← Back</a>
+
+    <!-- CHARTS SECTION -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-40">
+
+      <!-- Line Chart -->
+      <div class="my-6 w-full bg-gradient-to-r from-purple-800 to-purple-900 p-4 rounded-xl shadow-lg">
+        <h2 class="text-white text-lg font-semibold mb-2">Customer Input Feature Line Chart</h2>
+        <div id="feature-line-chart" class="h-[500px] w-full min-w-0 overflow-auto"></div>
+      </div>
+
+      <!-- Pie Chart -->
+      <div class="my-6 w-full bg-gradient-to-r from-purple-800 to-purple-900 p-4 rounded-xl shadow-lg">
+        <h2 class="text-white text-lg font-semibold mb-2">Feature Importance Pie Chart</h2>
+        <div id="feature-pie-chart" class="h-[500px] w-full min-w-0 overflow-auto"></div>
+      </div>
+
+      <!-- Bar Chart -->
+      <div class="my-6 w-full bg-gradient-to-r from-purple-800 to-purple-900 p-4 rounded-xl shadow-lg">
+        <h2 class="text-white text-lg font-semibold mb-2">Feature Importance Bar Chart</h2>
+        <div id="feature-bar-chart" class="h-[500px] w-full min-w-0 overflow-auto"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("churnForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const data = {
+        CreditScore: parseInt(document.getElementById("CreditScore").value),
+        Age: parseInt(document.getElementById("Age").value),
+        Geography: document.getElementById("Geography").value,
+        Gender: document.getElementById("Gender").value,
+        Balance: parseFloat(document.getElementById("Balance").value),
+        NumOfProducts: parseInt(document.getElementById("NumOfProducts").value),
+        HasCrCard: document.getElementById("HasCrCard").checked ? 1 : 0,
+        IsActiveMember: document.getElementById("IsActiveMember").checked ? 1 : 0
+      };
+
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        const resultDiv = document.getElementById("result");
+
+        if (result.churn_probability !== undefined) {
+          resultDiv.innerHTML = `
+            <p class="text-xl mt-4 text-white">Churn Probability: <span class="text-yellow-400 font-bold">${(result.churn_probability * 100).toFixed(2)}%</span></p>
+            <p class="text-lg mt-2">Risk Level: <span class="font-semibold text-red-400">${result.risk_level}</span></p>
+          `;
+
+          // Render the charts
+          Plotly.newPlot("feature-line-chart", JSON.parse(result.line_chart), {responsive: true});
+          Plotly.newPlot("feature-pie-chart", JSON.parse(result.pie_chart), {responsive: true});
+          Plotly.newPlot("feature-bar-chart", JSON.parse(result.bar_chart), {responsive: true});
+
+          window.onresize = () => {
+            Plotly.Plots.resize(document.getElementById("feature-line-chart"));
+            Plotly.Plots.resize(document.getElementById("feature-pie-chart"));
+            Plotly.Plots.resize(document.getElementById("feature-bar-chart"));
+          };
+        } else {
+          resultDiv.innerHTML = `<p style="color: #ff6b6b;">Error: ${result.error}</p>`;
+        }
+      } catch (err) {
+        document.getElementById("result").innerHTML = `<p style="color: #ff6b6b;">Error: Failed to connect to backend</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
